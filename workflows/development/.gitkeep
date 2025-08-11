@@ -1,0 +1,11 @@
+# Development Workflows
+
+This directory contains workflows in development, testing, or experimental phase.
+
+## Guidelines
+- Document experimental features and limitations
+- Include test results and validation notes
+- Follow naming convention: `DEV_[ProcessName]_v[X.Y].md`
+- Move to production/ when stable and validated
+
+*Remove this file when adding the first development workflow.*

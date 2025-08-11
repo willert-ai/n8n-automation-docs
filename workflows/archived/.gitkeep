@@ -1,0 +1,11 @@
+# Archived Workflows
+
+This directory contains deprecated, replaced, or no longer active workflows.
+
+## Guidelines
+- Include reason for archival in documentation
+- Maintain for historical reference
+- Follow naming convention: `ARCHIVED_[ProcessName]_v[X.Y].md`
+- Include migration notes if replaced by newer workflow
+
+*Remove this file when adding the first archived workflow.*

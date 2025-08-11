@@ -1,0 +1,11 @@
+# Production Workflows
+
+This directory contains live, actively used n8n automation workflows.
+
+## Guidelines
+- Only deploy thoroughly tested workflows here
+- Each workflow must have complete documentation
+- Include monitoring and error handling
+- Follow naming convention: `PROD_[ProcessName]_v[X.Y].md`
+
+*Remove this file when adding the first production workflow.*
