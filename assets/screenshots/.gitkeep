@@ -1,0 +1,17 @@
+# Screenshots Directory
+
+This directory contains screenshots of n8n workflows for documentation purposes.
+
+## Guidelines
+- Use descriptive filenames: `[WorkflowName]_[ViewType]_[Date].png`
+- Include workflow overview screenshots
+- Capture node configuration examples
+- Show error states for troubleshooting guides
+- Keep file sizes reasonable (< 2MB per image)
+
+## Naming Conventions
+- `PROD_InvoiceProcessing_Overview_2025-08-11.png`
+- `DEV_CustomerSync_NodeConfig_2025-08-11.png`
+- `Error_APITimeout_Example_2025-08-11.png`
+
+*Remove this file when adding the first screenshot.*

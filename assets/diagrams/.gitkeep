@@ -1,0 +1,24 @@
+# Diagrams Directory
+
+This directory contains technical diagrams and flowcharts for workflow documentation.
+
+## Guidelines
+- Use standard diagram formats (PNG, SVG, or Mermaid)
+- Include data flow diagrams
+- Show integration architectures
+- Document error handling flows
+- Use consistent styling and notation
+
+## Types of Diagrams
+- **Data Flow:** How data moves through the workflow
+- **Integration Architecture:** External system connections
+- **Error Handling:** Exception and recovery paths
+- **Business Process:** High-level process flows
+- **Network Topology:** Infrastructure and connectivity
+
+## Naming Conventions
+- `[WorkflowName]_DataFlow_[Date].svg`
+- `[WorkflowName]_Architecture_[Date].png`
+- `[WorkflowName]_ErrorHandling_[Date].mmd`
+
+*Remove this file when adding the first diagram.*
