@@ -21,4 +21,4 @@ Comprehensive capture and enrichment system for web content, documents, and note
 🟢 **Production** - Active and maintained
 
 ## Last Updated
-January 2025
+September 2025
