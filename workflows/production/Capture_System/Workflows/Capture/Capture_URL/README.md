@@ -1,4 +1,4 @@
-# PROD_CaptureEnrichStore_v1.0
+# Capture_URL_v1.0
 
 ## Overview
 Production workflow for capturing, enriching, and storing web content with AI-powered analysis and vector embeddings.
