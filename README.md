@@ -38,18 +38,20 @@ This repository serves as the central documentation hub for all n8n automation w
 ## 📊 Workflow Index
 
 ### 🟢 Production Workflows
-*Currently no production workflows documented. Add your first workflow!*
 
-| Workflow Name | Purpose | Status | Last Updated | Maintainer |
-|---------------|---------|--------|--------------|------------|
-| *Coming soon* | *-* | *-* | *-* | *-* |
+| Workflow/System | Purpose | Status | Last Updated | Documentation |
+|-----------------|---------|--------|--------------|---------------|
+| **[Capture System](./workflows/production/Capture_System/)** | Web content capture, enrichment & storage | 🟢 Active | Jan 2025 | [View Docs](./workflows/production/Capture_System/) |
+| ↳ [Capture_URL_v1.0](./workflows/production/Capture_System/Workflows/Capture/Capture_URL/) | URL capture & AI enrichment workflow | 🟢 Active | Jan 2025 | [Workflow](./workflows/production/Capture_System/Workflows/Capture/Capture_URL/) |
+| ↳ [Chrome Extension](./workflows/production/Capture_System/Extensions/Chrome/) | Browser extension for capture | 🟢 Active | Jan 2025 | [Extension](./workflows/production/Capture_System/Extensions/Chrome/) |
+| [Dropscan Document Management](./workflows/production/PROD_DropscanDocumentManagement_v1.0.md) | Document processing automation | 🟢 Active | Aug 2025 | [View Doc](./workflows/production/PROD_DropscanDocumentManagement_v1.0.md) |
 
 ### 🟡 Development Workflows  
-*Currently no development workflows documented.*
+*Currently no active development workflows.*
 
 | Workflow Name | Purpose | Status | Last Updated | Maintainer |
 |---------------|---------|--------|--------------|------------|
-| *Coming soon* | *-* | *-* | *-* | *-* |
+| *None active* | *-* | *-* | *-* | *-* |
 
 ---
 
@@ -79,11 +81,14 @@ n8n-automation-docs/
 ├── 📄 CHANGELOG.md                 # Repository change history
 ├── 📁 workflows/
 │   ├── 📁 production/              # Live workflows
+│   │   └── 📁 Capture_System/      # Complete capture ecosystem
+│   │       ├── 📁 Extensions/      # Browser extensions
+│   │       ├── 📁 Workflows/       # n8n workflows
+│   │       └── 📁 Shared_Components/ # Database, API, Monitoring
 │   ├── 📁 development/             # Testing workflows
 │   └── 📁 archived/                # Deprecated workflows
 ├── 📁 templates/
-│   ├── 📄 workflow-documentation-template.md
-│   └── 📄 node-configuration-template.md
+│   └── 📄 google-sheets-setup.md
 ├── 📁 troubleshooting/
 │   ├── 📄 common-errors.md         # Frequent issues and solutions
 │   ├── 📄 debugging-playbook.md    # Systematic debugging guide
@@ -131,6 +136,6 @@ For issues with:
 
 *📝 This repository structure and documentation system was designed using the n8n-expert Claude specialist with integrated auto-documentation capabilities.*
 
-**Last Updated:** August 11, 2025  
+**Last Updated:** January 9, 2025  
 **Repository Created:** August 11, 2025  
 **Maintainer:** Florian Willert (@willert-ai)
