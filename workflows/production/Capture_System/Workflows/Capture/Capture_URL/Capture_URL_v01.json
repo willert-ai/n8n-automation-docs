@@ -1,0 +1,415 @@
+{
+  "name": "Capture_URL_v01",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "19a5d8b7-edca-4284-8656-356c0c56e6bf",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "e3ef5adc-a9bc-44d1-9d56-bf1979171fa4",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        208,
+        304
+      ],
+      "webhookId": "19a5d8b7-edca-4284-8656-356c0c56e6bf",
+      "typeVersion": 2.1
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"status\": \"received\"}",
+        "options": {}
+      },
+      "id": "respond-to-webhook",
+      "name": "Respond_ToWebhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        432,
+        208
+      ],
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate and prepare the incoming data\nconst items = [];\nfor (const item of $input.all()) {\n  // The webhook data comes nested in body\n  const input = item.json.body || item.json;\n  \n  // Validation\n  const errors = [];\n  \n  // Check URL exists and is valid\n  if (!input.url) {\n    errors.push('URL is required');\n  } else if (!input.url.match(/^https?:\\/\\/.+/)) {\n    errors.push('URL must be a valid HTTP/HTTPS URL');\n  }\n  \n  // Check captured_at exists and is valid\n  if (!input.captured_at) {\n    errors.push('captured_at timestamp is required');\n  } else {\n    const capturedDate = new Date(input.captured_at);\n    if (isNaN(capturedDate.getTime())) {\n      errors.push('captured_at must be a valid ISO timestamp');\n    } else if (capturedDate > new Date()) {\n      errors.push('captured_at cannot be in the future');\n    }\n  }\n  \n  // If validation fails, throw error\n  if (errors.length > 0) {\n    throw new Error(`Validation failed: ${errors.join(', ')}`);\n  }\n  \n  // Check if URL is fetchable (not internal)\n  const internalPatterns = [\n    /^https?:\\/\\/(localhost|127\\.0\\.0\\.1)/,\n    /^https?:\\/\\/192\\.168\\./,\n    /^https?:\\/\\/10\\./,\n    /^https?:\\/\\/172\\.(1[6-9]|2[0-9]|3[0-1])\\./,\n    /\\.local$/,\n    /fritz\\.box/,\n    /\\.internal$/\n  ];\n  const is_fetchable = !internalPatterns.some(pattern => pattern.test(input.url));\n  \n  // Normalize URL - remove tracking parameters\n  const normalizedUrl = input.url\n    .replace(/[?&](utm_[^&]*|fbclid|gclid|ref|source)=[^&]*/g, '')\n    .replace(/[?&]$/, '')\n    .replace(/\\/$/, '');\n  \n  // Generate unique ID\n  const captureId = `cap_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;\n  \n  // Prepare essential output only\n  const output = {\n    // Core data\n    capture_id: captureId,\n    url: input.url,\n    url_normalized: normalizedUrl,\n    page_title: input.title || input.page_title || null,\n    comment: input.comment || null,\n    captured_at: input.captured_at,\n    processing_started: new Date().toISOString(),\n    geo_location: input.geo_location || null,\n    is_fetchable: is_fetchable\n  };\n  \n  items.push({\n    json: output,\n    pairedItem: item.pairedItem\n  });\n}\nreturn items;"
+      },
+      "id": "validate-and-prepare",
+      "name": "Code_ValidateAndPrepare",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        432,
+        400
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "mode": "list",
+          "value": "primary",
+          "cachedResultName": "Primary"
+        },
+        "limit": 5,
+        "options": {
+          "timeMin": "={{ $json.captured_at }}",
+          "timeMax": "={{ new Date(new Date($json.captured_at).getTime() + 1000).toISOString() }}",
+          "singleEvents": true
+        }
+      },
+      "id": "google-calendar-events",
+      "name": "GoogleCalendar_GetEvents",
+      "type": "n8n-nodes-base.googleCalendar",
+      "position": [
+        656,
+        400
+      ],
+      "typeVersion": 1.2,
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "XfYi82QOpy3uArK8",
+          "name": "Google Calendar account"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = [];\nconst captureData = $('Code_ValidateAndPrepare').item.json;\n\nfor (const item of $input.all()) {\n  const data = item.json;\n  \n  // Initialize calendar context\n  let calendar_context = {\n    event_title: null,\n    event_description: null,\n    event_attendees: [],\n    calendar_fetch_status: 'no_events'\n  };\n  \n  // Skip working location events entirely\n  if (data.eventType === 'workingLocation' || \n      data.eventType === 'outOfOffice' || \n      data.eventType === 'focusTime') {\n    // Don't process this item at all - skip it\n    continue;\n  }\n  \n  // Process real events\n  if (data.id && data.summary) {\n    calendar_context = {\n      event_title: data.summary || null,\n      event_description: data.description || null,\n      event_attendees: data.attendees?.map(a => a.email) || [],\n      calendar_fetch_status: 'success'\n    };\n  }\n  \n  // Merge with capture data and output\n  items.push({\n    json: {\n      ...captureData,\n      ...calendar_context\n    },\n    pairedItem: item.pairedItem\n  });\n}\n\n// If no items (all were working locations), return one item with no event\nif (items.length === 0) {\n  items.push({\n    json: {\n      ...captureData,\n      event_title: null,\n      event_description: null,\n      event_attendees: [],\n      calendar_fetch_status: 'no_events'\n    }\n  });\n}\n\nreturn items;"
+      },
+      "id": "code-extract-calendar",
+      "name": "Code_ExtractCalendarContext",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        880,
+        400
+      ],
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "url": "={{$('Code_ValidateAndPrepare').item.json.url_normalized}}",
+        "options": {
+          "redirect": {
+            "redirect": {}
+          },
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 10000
+        }
+      },
+      "id": "http-fetch-webpage",
+      "name": "HTTP_FetchWebpage",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1104,
+        400
+      ],
+      "typeVersion": 4.2,
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the HTTP response\nconst inputData = $input.first().json;\nconst inputItem = $input.first(); // Get the full item for pairedItem reference\n\n// First check: is this URL even fetchable?\nif (inputData.is_fetchable === false) {\n  return [{\n    json: {\n      ...inputData,\n      fetch_status: 'skipped_internal',\n      content_for_ai: null,\n      metadata: {}\n    },\n    pairedItem: inputItem.pairedItem // Preserve item linking\n  }];\n}\n\n// Second check: did the HTTP request succeed?\nif (!inputData.data) {\n  return [{\n    json: {\n      ...inputData,\n      fetch_status: 'failed',\n      content_for_ai: null,\n      metadata: {}\n    },\n    pairedItem: inputItem.pairedItem // Preserve item linking\n  }];\n}\n\n// If we get here, we have fetchable URL AND successful fetch\nconst html = inputData.data;\n\n// More flexible metadata extraction to handle various quote styles\nconst extractMeta = (property, name = 'property') => {\n  const pattern = new RegExp(\n    `<meta[^>]*${name}\\\\s*=\\\\s*[\"']${property}[\"'][^>]*content\\\\s*=\\\\s*[\"']([^\"']*?)[\"']`,\n    'i'\n  );\n  const match = html.match(pattern);\n  return match ? match[1].trim() : null;\n};\n\n// Get metadata with flexible extraction\nconst metadata = {\n  og_title: extractMeta('og:title'),\n  og_description: extractMeta('og:description'),\n  meta_description: extractMeta('description', 'name'),\n  title: html.match(/<title[^>]*>([^<]+)<\\/title>/i)?.[1]?.trim() || null\n};\n\n// Extract first 10 paragraphs as fallback content\nconst paragraphs = html.match(/<p[^>]*>([^<]+)<\\/p>/gi) || [];\nconst paragraphText = paragraphs\n  .slice(0, 10)\n  .map(p => p.replace(/<[^>]+>/g, '').trim())\n  .filter(p => p.length > 50)\n  .join(' ');\n\n// Combine best available content for AI\nconst content_for_ai = [\n  metadata.og_title || metadata.title || inputData.page_title,\n  metadata.og_description || metadata.meta_description,\n  paragraphText.substring(0, 2000),\n  inputData.comment ? `User note: ${inputData.comment}` : ''\n]\n.filter(Boolean)\n.join('. ')\n.substring(0, 3000);\n\n// Return enriched data\nreturn [{\n  json: {\n    ...inputData,\n    fetch_status: 'success',\n    content_for_ai: content_for_ai,\n    metadata: metadata\n  },\n  pairedItem: inputItem.pairedItem // Preserve item linking\n}];"
+      },
+      "id": "code-extract-text",
+      "name": "Code_ExtractText",
+      "type": "n8n-nodes-base.code",
+      "position": [
+        1328,
+        400
+      ],
+      "typeVersion": 2,
+      "retryOnFail": false,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4.1-MINI"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=You are an expert content analyst specializing in extracting key information from web content. Your task is to analyze a captured webpage and provide structured insights that help the user understand and recall why they saved this content.\n\nContext:\n- URL: {{ $('Code_ValidateAndPrepare').item.json.url_normalized }}\n- Page Title: {{$('Code_ValidateAndPrepare').item.json.page_title}}\n- User's Capture Note: {{$('Code_ValidateAndPrepare').item.json.comment}}\n- Page Content: {{$json.content_for_ai}}\n- Calendar Context: {{$('Code_ExtractCalendarContext').item.json.event_title ? 'Captured during \"' + $('Code_ExtractCalendarContext').item.json.event_title + '\"' : 'No active event'}}\n- Event Description: {{$('Code_ExtractCalendarContext').item.json.event_description || 'N/A'}}\n\nAnalysis Process:\n\nSTEP 1 - DETERMINE USER INTENT:\nAnalyze BOTH the user's comment AND calendar event (when available) to understand why this was captured:\n- If both exist: Consider how they relate (e.g., \"design example\" + \"Marketing Meeting\" = seeking design inspiration for marketing materials)\n- If only comment exists: Use it as primary intent indicator\n- If only calendar exists: Infer intent from calendar context\n- If neither exists: Analyze content objectively\n\nSTEP 2 - CREATE SUMMARY (80-120 words):\nWrite a summary that:\n- Opens with what the page/service IS (objective description)\n- Incorporates the user's capture intent naturally within the description\n- Balances factual content (60-70%) with contextual relevance (30-40%)\n- Makes the summary useful for future retrieval\n\nSTEP 3 - CATEGORIZE & EXTRACT:\n- Topic: The primary content category (2-4 words)\n- Keywords: 3-5 terms mixing content-specific terms with intent-related terms\n\nSTEP 4 - KEY INSIGHT:\nOne sentence that bridges what the content offers with why it matters to the user\n\nOutput format:\n{\n  \"summary\": \"Your balanced 80-120 word summary\",\n  \"topic\": \"Content Category\",\n  \"keywords\": [\"keyword1\", \"keyword2\", \"keyword3\", \"keyword4\", \"keyword5\"],\n  \"key_insight\": \"One sentence capturing essential value\"\n}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "openai-full-analysis",
+      "name": "OpenAI_FullAnalysis",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "position": [
+        1552,
+        400
+      ],
+      "typeVersion": 1.4,
+      "credentials": {
+        "openAiApi": {
+          "id": "4D236iTEC8o7Xl5z",
+          "name": "OpenAi account 2"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n{\nmodel: \"text-embedding-3-small\",\ninput: [\n($json.summary || ''),\n(Array.isArray($json.keywords) ? $json.keywords.join(' ') : ''),\n($json.key_insight || ''),\n($('Code_ValidateAndPrepare').item.json.comment || ''),\n($('Code_ValidateAndPrepare').item.json.page_title || '')\n].join(' ').trim()\n}\n}}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "http-generate-embedding",
+      "name": "HTTP_GenerateEmbedding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1904,
+        400
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "4D236iTEC8o7Xl5z",
+          "name": "OpenAi account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "captures",
+        "dataToSend": "=defineBelow",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "capture_id",
+              "fieldValue": "={{ $('Code_ValidateAndPrepare').item.json.capture_id }}"
+            },
+            {
+              "fieldId": "url",
+              "fieldValue": "={{ $('Code_ValidateAndPrepare').item.json.url }}"
+            },
+            {
+              "fieldId": "url_normalized",
+              "fieldValue": "={{ $('Code_ValidateAndPrepare').item.json.url_normalized }}"
+            },
+            {
+              "fieldId": "page_title",
+              "fieldValue": "={{ $('Code_ValidateAndPrepare').item.json.page_title }}"
+            },
+            {
+              "fieldId": "user_comment",
+              "fieldValue": "={{ $('Code_ValidateAndPrepare').item.json.comment }}"
+            },
+            {
+              "fieldId": "captured_at",
+              "fieldValue": "={{ $('Code_ValidateAndPrepare').item.json.captured_at }}"
+            },
+            {
+              "fieldId": "captured_date",
+              "fieldValue": "={{ $('Code_ValidateAndPrepare').item.json.captured_at.split('T')[0] }}"
+            },
+            {
+              "fieldId": "summary",
+              "fieldValue": "={{ $('OpenAI_FullAnalysis').item.json.message.content.summary }}"
+            },
+            {
+              "fieldId": "keywords",
+              "fieldValue": "={{ $('OpenAI_FullAnalysis').item.json.message.content.keywords }}"
+            },
+            {
+              "fieldId": "key_insight",
+              "fieldValue": "={{ $('OpenAI_FullAnalysis').item.json.message.content.key_insight }}"
+            },
+            {
+              "fieldId": "topic",
+              "fieldValue": "={{ $('OpenAI_FullAnalysis').item.json.message.content.topic }}"
+            },
+            {
+              "fieldId": "event_title",
+              "fieldValue": "={{ $('Code_ExtractCalendarContext').item.json.event_title }}"
+            },
+            {
+              "fieldId": "event_attendees",
+              "fieldValue": "={{ $('Code_ExtractCalendarContext').item.json.event_attendees }}"
+            },
+            {
+              "fieldId": "geo_latitude",
+              "fieldValue": "={{ $('Code_ValidateAndPrepare').item.json.geo_location.result.latitude }}"
+            },
+            {
+              "fieldId": "geo_longitude",
+              "fieldValue": "={{ $('Code_ValidateAndPrepare').item.json.geo_location.result.longitude }}"
+            },
+            {
+              "fieldId": "is_internal",
+              "fieldValue": "={{ $('Code_ValidateAndPrepare').item.json.is_fetchable }}"
+            },
+            {
+              "fieldId": "metadata",
+              "fieldValue": "={{ $('Code_ExtractText').item.json.metadata }}"
+            },
+            {
+              "fieldId": "embedding",
+              "fieldValue": "={{ JSON.stringify($json.data[0].embedding) }}"
+            },
+            {
+              "fieldId": "workflow_version",
+              "fieldValue": "1.0"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2128,
+        400
+      ],
+      "id": "c75951ad-2db5-46c5-8794-10a3b90aaf76",
+      "name": "Create a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "jY2mBk2MtJtl50Nq",
+          "name": "Supabase account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond_ToWebhook",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code_ValidateAndPrepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code_ValidateAndPrepare": {
+      "main": [
+        [
+          {
+            "node": "GoogleCalendar_GetEvents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GoogleCalendar_GetEvents": {
+      "main": [
+        [
+          {
+            "node": "Code_ExtractCalendarContext",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code_ExtractCalendarContext": {
+      "main": [
+        [
+          {
+            "node": "HTTP_FetchWebpage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP_FetchWebpage": {
+      "main": [
+        [
+          {
+            "node": "Code_ExtractText",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code_ExtractText": {
+      "main": [
+        [
+          {
+            "node": "OpenAI_FullAnalysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI_FullAnalysis": {
+      "main": [
+        [
+          {
+            "node": "HTTP_GenerateEmbedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP_GenerateEmbedding": {
+      "main": [
+        [
+          {
+            "node": "Create a row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveExecutionProgress": true,
+    "saveDataSuccessExecution": "all",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "ybqL6Lybsmegr8xk"
+  },
+  "versionId": "259f2f72-7af5-47d6-90de-6d4719b52ad9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "10617c3098b0edb800e91d09e79c89eedc3beb6ece81bc86669c84fa9d3bd135"
+  },
+  "id": "ybqL6Lybsmegr8xk",
+  "tags": []
+}
