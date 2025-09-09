@@ -186,7 +186,7 @@ Chrome/
 │   ├── icon32.png        # 32x32 pixels
 │   ├── icon48.png        # 48x48 pixels
 │   └── icon128.png       # 128x128 pixels
-├── Capture.png           # Original logo file
+│   └── Capture.png       # Original logo file
 └── README.md            # This documentation
 ```
 
